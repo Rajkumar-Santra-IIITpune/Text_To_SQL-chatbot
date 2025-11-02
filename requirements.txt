@@ -1,7 +1,8 @@
-streamlit
-langchain
-langchain-google-genai
-langchain-core
-psycopg2-binary
-pandas
-python-dotenv
+streamlit==1.51.0
+langchain==1.0.3
+langchain-core==1.0.2
+langchain-community==0.3.0
+langchain-google-genai==3.0.0
+psycopg2-binary==2.9.11
+pandas==2.3.3
+python-dotenv==1.2.1
