@@ -1,3 +1,4 @@
+# Importing Libraries
 import streamlit as st
 from langchain_community.utilities import SQLDatabase
 from langchain_core.prompts import ChatPromptTemplate
@@ -7,39 +8,38 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 import psycopg2
 import pandas as pd
 import os
-from urllib.parse import quote_plus
 from dotenv import load_dotenv
+from urllib.parse import quote_plus
 
-# Load env for local dev
+# Load environment variables from .env file
 load_dotenv()
 
-# Get Supabase (PostgreSQL) credentials
-host = os.getenv("SUPABASE_HOST") or st.secrets.get("SUPABASE_HOST")
-port = os.getenv("SUPABASE_PORT") or st.secrets.get("SUPABASE_PORT")
-user = os.getenv("SUPABASE_USER") or st.secrets.get("SUPABASE_USER")
-password = quote_plus(os.getenv("SUPABASE_PASSWORD") or st.secrets.get("SUPABASE_PASSWORD", ""))
-database = os.getenv("SUPABASE_DB") or st.secrets.get("SUPABASE_DB")
+# PostgreSQL connection details
+host = os.getenv("POSTGRES_HOST")
+port = os.getenv("POSTGRES_PORT")
+username = os.getenv("POSTGRES_USERNAME")
+password = quote_plus(os.getenv("POSTGRES_PASSWORD") or "")
+database_schema = os.getenv("POSTGRES_DATABASE")
 
-# Get Google API key
-google_api_key = os.getenv("GOOGLE_API_KEY") or st.secrets.get("GOOGLE_API_KEY")
+# ✅ Properly formatted PostgreSQL URI
+postgres_uri = f"postgresql+psycopg2://{username}:{password}@{host}:{int(port)}/{database_schema}"
 
-# PostgreSQL connection URI
-postgres_uri = f"postgresql+psycopg2://{user}:{password}@{host}:{int(port or 5432)}/{database}"
-
-# Connect to database
+# Connect to PostgreSQL database
 db = SQLDatabase.from_uri(postgres_uri, sample_rows_in_table_info=1)
 
+# Get database schema
 def get_schema(db):
     return db.get_table_info()
 
+# Execute SQL query and return results
 def execute_sql_query(sql_query):
     try:
         conn = psycopg2.connect(
             host=host,
             port=int(port),
-            user=user,
-            password=os.getenv("SUPABASE_PASSWORD") or st.secrets.get("SUPABASE_PASSWORD"),
-            database=database
+            user=username,
+            password=os.getenv("POSTGRES_PASSWORD"),
+            database=database_schema
         )
         cursor = conn.cursor()
         cursor.execute(sql_query)
@@ -73,8 +73,13 @@ Answer:
 sql_prompt = ChatPromptTemplate.from_template(sql_template)
 nl_prompt = ChatPromptTemplate.from_template(nl_template)
 
-llm = ChatGoogleGenerativeAI(model="gemini-2.5-pro", api_key=google_api_key)
+# Google Generative AI model
+llm = ChatGoogleGenerativeAI(
+    model="gemini-2.5-pro",
+    api_key=os.getenv("GOOGLE_API_KEY")
+)
 
+# SQL query generator chain
 sql_chain = (
     RunnablePassthrough.assign(schema=lambda _: get_schema(db))
     | sql_prompt
@@ -82,6 +87,7 @@ sql_chain = (
     | StrOutputParser()
 )
 
+# Natural language response chain
 nl_chain = (
     RunnablePassthrough()
     | nl_prompt
@@ -89,6 +95,7 @@ nl_chain = (
     | StrOutputParser()
 )
 
+# Streamlit UI
 st.title("Text-to-SQL with Natural Language Response (Gemini 2.5 Pro)")
 
 question = st.text_input("Enter your natural language query:")
@@ -97,6 +104,7 @@ if st.button("Submit"):
     if question:
         sql_query = sql_chain.invoke({"question": question}).strip()
 
+        # Clean LLM output
         for prefix in ["sql", "query", "SQL", "Query", "```sql", "```"]:
             if sql_query.lower().startswith(prefix.lower()):
                 sql_query = sql_query[len(prefix):].strip()
