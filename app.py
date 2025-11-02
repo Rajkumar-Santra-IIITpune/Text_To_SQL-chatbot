@@ -22,7 +22,7 @@ password = quote_plus(os.getenv("POSTGRES_PASSWORD") or "")
 database_schema = os.getenv("POSTGRES_DATABASE")
 
 # ✅ Properly formatted PostgreSQL URI
-postgres_uri = f"postgresql+psycopg2://{username}:{password}@{host}:{int(port)}/{database_schema}"
+postgres_uri = f"postgresql+psycopg2://{username}:{password}@{host}:{int(port or 5432)}/{database_schema}"
 
 # Connect to PostgreSQL database
 db = SQLDatabase.from_uri(postgres_uri, sample_rows_in_table_info=1)
